@@ -1,0 +1,8 @@
+pip
+setuptools
+pandas
+beautifulsoup4
+tqdm
+jupyterlab
+jupyter
+seaborn
