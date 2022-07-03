@@ -15,7 +15,6 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-
 logging.basicConfig(level=logging.INFO)
 LISTINGS_ON_PAGE_LIMIT = 72
 MIN_DISTANCE = 4
@@ -95,8 +94,8 @@ def post_processing(df=None):
         logging.info(f"data path: {data_path}")
         df = pd.read_csv(data_path, index_col=0)
         logging.info(f"data shape {df.shape}")
-    df.price = df.price.str.replace('zł/mc', '').str.strip().astype(int)
-    df.Kaucja = df.Kaucja.str.replace('zapytaj', '-1').str.replace('zł', '').str.replace(' ', '').str.strip().fillna(0).astype(int)
+    df.price = df.price.str.replace('zł/mc', '').str.replace(',', '.').astype(float)
+    df.Kaucja = df.Kaucja.str.replace('zapytaj', '-1').str.replace('zł', '').str.replace(' ', '').str.strip().fillna(0).str.replace(',', '.').astype(float)
 
     df.rooms = df.rooms.apply(lambda x: [int(d) for d in x if d.isdigit()][0])
     df.area = df.area.str.replace('m2', '').str.strip().astype(float)
@@ -110,7 +109,7 @@ def post_processing(df=None):
         df['district_l2'] = None
 
     df.drop(['Powierzchnia', 'Obsługa zdalna', 'Stan wykończenia'], axis=1, inplace=True)
-    df.Czynsz = df.Czynsz.str.replace('zapytaj', '-1').str.replace('zł/miesiąc', '').str.replace(' ', '').astype(int)
+    df.Czynsz = df.Czynsz.str.replace('zapytaj', '-1').str.replace('zł/miesiąc', '').str.replace(' ', '').str.replace(',', '.').astype(float)
 
     df.city = df.city.str.strip()
     df.district_l1 = df.district_l1.str.strip()

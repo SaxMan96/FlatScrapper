@@ -8,7 +8,7 @@ import streamlit as st
 from scrapper import post_processing, scrap_pages, generate_summary
 
 
-def main():
+def local_test():
     scrap_pages(max_search=1000, max_price=4000, min_area=40, days_since_created=2)
     post_processing()
     generate_summary()
@@ -32,7 +32,7 @@ def make_map(df):
     return fig
 
 
-def streamlit_main():
+def main():
     warnings.filterwarnings("ignore")
     try:
         max_price = st.sidebar.slider("Max Price", 0, 1000, 4000, 100)
@@ -78,6 +78,6 @@ def test_map():
 
 
 if __name__ == "__main__":
-    # main()
-    streamlit_main()
+    # local_test()
+    main()
     # test_map()
