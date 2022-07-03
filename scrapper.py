@@ -15,6 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+
 logging.basicConfig(level=logging.INFO)
 LISTINGS_ON_PAGE_LIMIT = 72
 MIN_DISTANCE = 4
@@ -32,13 +33,14 @@ HEADERS = {
 import textwrap
 
 
-def generate_summary():
-    data_path = sorted(glob.glob("data/processed/*.csv"))[-1]
-    logging.info(f"data path: {data_path}")
-    df = pd.read_csv(data_path, index_col=0)
+def generate_summary(df=None):
+    if df is None:
+        data_path = sorted(glob.glob("data/processed/*.csv"))[-1]
+        logging.info(f"data path: {data_path}")
+        df = pd.read_csv(data_path, index_col=0)
     df = df.head(15)
     current_date = datetime.now().strftime("%Y_%m_%d")
-    summary = [f"## {current_date} ({df.shape[0]} ogłoszeń)"]
+    summary = []
     for i, row in df.iterrows():
         row = df.loc[i]
         if np.isnan(row.distance):
@@ -54,18 +56,16 @@ def generate_summary():
             czynsz = f"w tym czynsz {row.Czynsz}zł"
             price = row.price + row.Czynsz
 
-        summary.append(textwrap.dedent(f"""
-            #### [{i}] {row.localization_info.replace("Warszawa, ", "")} ({distance}km, {duration}min do centrum)
-            - {price}zł ({czynsz})
-            - {row.rooms} pokoje
-            - {int(row.area)} m2
-            - piętro {row.Piętro} {row['Rodzaj zabudowy']} 
-            - {row.listing_url} 
+        summary.append((f"""
+- [{i}] {row.localization_info.replace("Warszawa, ", "")} ({distance}km, {duration}min do centrum) [link]({row.listing_url})
+    - {price}zł ({czynsz}) | {row.rooms} pokoje
+    - {int(row.area)} m2 | piętro {row.Piętro} {row['Rodzaj zabudowy']} 
         """))
     summary = "\n".join(summary)
     text_file = open(f"summary/message_{current_date}.md", "w")
     text_file.write(summary)
     text_file.close()
+    return summary
 
 
 def _get_lat_lon(address):
@@ -89,19 +89,25 @@ def _get_price_threshold(x):
     return 2300 - 1.9 * (1 - np.exp(0.095 * x))
 
 
-def post_processing():
-    data_path = sorted(glob.glob("data/raw/*.csv"))[-1]
-    logging.info(f"data path: {data_path}")
-    df = pd.read_csv(data_path, index_col=0)
-    logging.info(f"data shape {df.shape}")
+def post_processing(df=None):
+    if df is None:
+        data_path = sorted(glob.glob("data/raw/*.csv"))[-1]
+        logging.info(f"data path: {data_path}")
+        df = pd.read_csv(data_path, index_col=0)
+        logging.info(f"data shape {df.shape}")
     df.price = df.price.str.replace('zł/mc', '').str.strip().astype(int)
-    df.Kaucja = df.Kaucja.str.replace('zapytaj', '-1').str.replace('zł', '').str.replace(' ', '').str.strip().astype(int)
+    df.Kaucja = df.Kaucja.str.replace('zapytaj', '-1').str.replace('zł', '').str.replace(' ', '').str.strip().fillna(0).astype(int)
 
     df.rooms = df.rooms.apply(lambda x: [int(d) for d in x if d.isdigit()][0])
     df.area = df.area.str.replace('m2', '').str.strip().astype(float)
 
-    df[['city', 'district_l1', 'district_l2', 'street']] = df.localization_info.str.split(',', expand=True)
-    df.street = df.street.fillna(df.district_l2)
+    localization_df = df.localization_info.str.split(',', expand=True)
+    if localization_df.shape[1] == 4:
+        df[['city', 'district_l1', 'district_l2', 'street']] = localization_df
+        df.street = df.street.fillna(df.district_l2)
+    elif localization_df.shape[1] == 3:
+        df[['city', 'district_l1', 'street']] = localization_df
+        df['district_l2'] = None
 
     df.drop(['Powierzchnia', 'Obsługa zdalna', 'Stan wykończenia'], axis=1, inplace=True)
     df.Czynsz = df.Czynsz.str.replace('zapytaj', '-1').str.replace('zł/miesiąc', '').str.replace(' ', '').astype(int)
@@ -119,6 +125,7 @@ def post_processing():
 
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
     df.to_csv(f'data/processed/processed_data_{current_time}.csv')
+    return df
 
 
 def _drop_fakes(df):
@@ -182,7 +189,7 @@ def _scrap_listing(listing_element):
     return listing_property_dict
 
 
-def scrap_pages(max_search):
+def scrap_pages(max_search, days_since_created=1, min_area=35, max_price=4500, return_df=False):
     pages_to_scrap = math.ceil(max_search / LISTINGS_ON_PAGE_LIMIT)
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
     result_list = []
@@ -195,11 +202,11 @@ def scrap_pages(max_search):
         &limit={LISTINGS_ON_PAGE_LIMIT}
         &market=ALL
         &ownerTypeSingleSelect=ALL
-        &priceMax=4500
-        &areaMin=35
+        &priceMax={max_price}
+        &areaMin={min_area}
         &roomsNumber=%5BTWO%2CTHREE%5D
         &locations=%5Bdistricts_6-3319%2Cdistricts_6-39%2Cdistricts_6-40%2Cdistricts_6-44%2Cdistricts_6-53%2Cdistricts_6-117%5D
-        &daysSinceCreated=7
+        &daysSinceCreated={days_since_created}
         &media=%5B%5D
         &extras=%5B%5D
         &viewType=listing
@@ -215,7 +222,7 @@ def scrap_pages(max_search):
 
         soup = BeautifulSoup(requested_html, features='html.parser')
         _listings_div = soup.find_all('div', {'data-cy': "search.listing"})
-        if not _listings_div:
+        if len(_listings_div) < 2:
             break
         listings_div = _listings_div[1]
         listings_list = listings_div.find_all('li', {"class": "css-p74l73 es62z2j17"})
@@ -234,3 +241,5 @@ def scrap_pages(max_search):
             result_list.append(listing_property_dict)
         df = pd.DataFrame(result_list).drop_duplicates()
     df.to_csv(f'data/raw/scrapped_raw_data_{current_time}.csv')
+    if return_df:
+        return df

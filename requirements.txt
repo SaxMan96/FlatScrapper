@@ -6,3 +6,5 @@ tqdm
 jupyterlab
 jupyter
 seaborn
+streamlit
+plotly
