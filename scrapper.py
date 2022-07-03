@@ -32,7 +32,7 @@ HEADERS = {
 import textwrap
 
 
-def generate_summary(df=None):
+def generate_summary(df=None, save=True):
     if df is None:
         data_path = sorted(glob.glob("data/processed/*.csv"))[-1]
         logging.info(f"data path: {data_path}")
@@ -61,9 +61,10 @@ def generate_summary(df=None):
     - {int(row.area)} m2 | piętro {row.Piętro} {row['Rodzaj zabudowy']} 
         """))
     summary = "\n".join(summary)
-    text_file = open(f"summary/message_{current_date}.md", "w")
-    text_file.write(summary)
-    text_file.close()
+    if save:
+        text_file = open(f"summary/message_{current_date}.md", "w")
+        text_file.write(summary)
+        text_file.close()
     return summary
 
 
@@ -88,7 +89,7 @@ def _get_price_threshold(x):
     return 2300 - 1.9 * (1 - np.exp(0.095 * x))
 
 
-def post_processing(df=None):
+def post_processing(df=None, save=True):
     if df is None:
         data_path = sorted(glob.glob("data/raw/*.csv"))[-1]
         logging.info(f"data path: {data_path}")
@@ -123,7 +124,8 @@ def post_processing(df=None):
     df = _order_by_rank(df)
 
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
-    df.to_csv(f'data/processed/processed_data_{current_time}.csv')
+    if save:
+        df.to_csv(f'data/processed/processed_data_{current_time}.csv')
     return df
 
 
@@ -188,7 +190,7 @@ def _scrap_listing(listing_element):
     return listing_property_dict
 
 
-def scrap_pages(max_search, days_since_created=1, min_area=35, max_price=4500, return_df=False):
+def scrap_pages(max_search, days_since_created=1, min_area=35, max_price=4500, return_df=False, save=True):
     pages_to_scrap = math.ceil(max_search / LISTINGS_ON_PAGE_LIMIT)
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
     result_list = []
@@ -239,6 +241,7 @@ def scrap_pages(max_search, days_since_created=1, min_area=35, max_price=4500, r
             listing_property_dict = {**listing_property_dict, **_scrap_listing(listing_element)}
             result_list.append(listing_property_dict)
         df = pd.DataFrame(result_list).drop_duplicates()
-    df.to_csv(f'data/raw/scrapped_raw_data_{current_time}.csv')
+    if save:
+        df.to_csv(f'data/raw/scrapped_raw_data_{current_time}.csv')
     if return_df:
         return df

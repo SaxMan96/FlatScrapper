@@ -15,8 +15,8 @@ def local_test():
 
 
 def get_data(max_price=4000, min_area=40, days_since_created=2):
-    df = scrap_pages(max_search=1000, max_price=max_price, min_area=min_area, days_since_created=days_since_created, return_df=True)
-    df = post_processing(df)
+    df = scrap_pages(max_search=1000, max_price=max_price, min_area=min_area, days_since_created=days_since_created, return_df=True, save=False)
+    df = post_processing(df, save=False)
     return df
 
 
@@ -42,7 +42,7 @@ def main():
             with st.spinner("Loading The Data"):
                 df = get_data(max_price=max_price, min_area=min_area, days_since_created=days_since_created)
                 st.balloons()
-                summary = generate_summary(df)
+                summary = generate_summary(df, save=False)
                 if df.empty:
                     st.error("Empty Data Frame")
                 else:
