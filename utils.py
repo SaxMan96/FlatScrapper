@@ -17,10 +17,10 @@ def make_map(df):
         text=df['index'].astype(str),
         customdata=np.stack((
             df['index'], df['price'], df['area'], df['rooms'],
-            df['distance'].round(1), df['duration'].round(), df['localization_info']),
+            df['distance'].round(1), df['duration'].round(), df.localization_info.str.replace('Warszawa, ', '')),
             axis=-1),
         hoverinfo='text',
-        hovertemplate="<b>%{customdata[0]} %{customdata[6]}</b><br>"
+        hovertemplate="<b>%{customdata[0]}. %{customdata[6]}</b><br>"
                       + "%{customdata[1]}zł | %{customdata[2]}m2 | %{customdata[3]} rooms<br>"
                       + "to centre: %{customdata[4]}km %{customdata[5]}min<br>"
     )
