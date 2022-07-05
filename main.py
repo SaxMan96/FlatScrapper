@@ -23,7 +23,7 @@ def get_data(max_search=3, max_price=4000, min_area=40, days_since_created=2, **
 
 def main():
     try:
-        max_price = st.sidebar.slider("Max Price", 0, 1000, 3700, 100)
+        max_price = st.sidebar.slider("Max Price", 0, 4000, 3700, 100)
         min_area = st.sidebar.slider("Min Area", 0, 100, 48, 1)
         days_since_created = st.sidebar.slider("Days Since Created", 1, 14, 2, 1)
         max_search = st.sidebar.slider("Max Listings Search", 1, 1000, 250, 1)
