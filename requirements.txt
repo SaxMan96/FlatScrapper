@@ -2,7 +2,7 @@ pip
 setuptools
 pandas
 beautifulsoup4
-tqdm
+stqdm
 jupyterlab
 jupyter
 seaborn

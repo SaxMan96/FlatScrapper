@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from tqdm import tqdm
+from stqdm import stqdm
 
 logging.basicConfig(level=logging.INFO)
 LISTINGS_ON_PAGE_LIMIT = 72
@@ -23,6 +23,7 @@ MIN_AREA = 50
 MAX_PRICE = 4200
 CENTER_LAT = '52.2304944'
 CENTER_LON = '21.010445040894194'
+BAR_FORMAT = "{desc}: {percentage:.3f}%|{bar}|[remaining time: {remaining}"
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36',
@@ -52,11 +53,11 @@ def generate_summary(df=None, save=True):
             czynsz = "plus czynsz ??? zł"
             price = row.price
         else:
-            czynsz = f"w tym czynsz {row.Czynsz}zł"
-            price = row.price + row.Czynsz
+            czynsz = f"w tym czynsz {int(row.Czynsz)}zł"
+            price = int(row.price + row.Czynsz)
 
         summary.append((f"""
-- [{i}] {row.localization_info.replace("Warszawa, ", "")} ({distance}km, {duration}min do centrum) [link]({row.listing_url})
+- [{i}. {row.localization_info.replace("Warszawa, ", "")} ({distance}km, {duration}min do centrum)]({row.listing_url})
     - {price}zł ({czynsz}) | {row.rooms} pokoje
     - {int(row.area)} m2 | piętro {row.Piętro} {row['Rodzaj zabudowy']} 
         """))
@@ -149,7 +150,7 @@ def _order_by_rank(df):
 
 def _download_geo_data(df):
     logging.info("Downloading Geo Info")
-    for i, row in tqdm(df.iterrows(), total=len(df)):
+    for i, row in stqdm(df.iterrows(), total=len(df), desc='Downloading Geo Data', bar_format=BAR_FORMAT):
         row = df.loc[i]
         address = " ".join([row.city, row.district_l1, row.street]).replace('ul. ', '').replace('os. ', '').replace('/', '')
         lat, lon = _get_lat_lon(address)
@@ -190,45 +191,53 @@ def _scrap_listing(listing_element):
     return listing_property_dict
 
 
+def _make_url(current_page, max_price, min_area, days_since_created):
+    return textwrap.dedent(f"""
+            https://www.otodom.pl/pl/oferty/wynajem/mieszkanie/
+            wiele-lokalizacji?distanceRadius=0
+            &page={current_page}
+            &limit={LISTINGS_ON_PAGE_LIMIT}
+            &market=ALL
+            &ownerTypeSingleSelect=ALL
+            &priceMax={max_price}
+            &areaMin={min_area}
+            &roomsNumber=%5BTWO%2CTHREE%5D
+            &locations=%5Bdistricts_6-3319%2Cdistricts_6-39%2Cdistricts_6-40%2Cdistricts_6-44%2Cdistricts_6-53%2Cdistricts_6-117%5D
+            &daysSinceCreated={days_since_created}
+            &media=%5B%5D
+            &extras=%5B%5D
+            &viewType=listing
+            """).replace('\n', '')
+
+
+def _read_html(url):
+    request_info = request.Request(url, headers=HEADERS)
+    try:
+        requested_html = request.urlopen(request_info)
+    except HTTPError as e:
+        print(f"Skipping: {e.code}")
+        return None
+    return BeautifulSoup(requested_html, features='html.parser')
+
+
 def scrap_pages(max_search, days_since_created=1, min_area=35, max_price=4500, return_df=False, save=True):
     pages_to_scrap = math.ceil(max_search / LISTINGS_ON_PAGE_LIMIT)
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
     result_list = []
     for current_page in range(1, pages_to_scrap + 1):
         logging.info(f'Page {current_page}/{pages_to_scrap}')
-        url = textwrap.dedent(f"""
-        https://www.otodom.pl/pl/oferty/wynajem/mieszkanie/
-        wiele-lokalizacji?distanceRadius=0
-        &page={current_page}
-        &limit={LISTINGS_ON_PAGE_LIMIT}
-        &market=ALL
-        &ownerTypeSingleSelect=ALL
-        &priceMax={max_price}
-        &areaMin={min_area}
-        &roomsNumber=%5BTWO%2CTHREE%5D
-        &locations=%5Bdistricts_6-3319%2Cdistricts_6-39%2Cdistricts_6-40%2Cdistricts_6-44%2Cdistricts_6-53%2Cdistricts_6-117%5D
-        &daysSinceCreated={days_since_created}
-        &media=%5B%5D
-        &extras=%5B%5D
-        &viewType=listing
-        """).replace('\n', '')
-
-        request_info = request.Request(url, headers=HEADERS)
-
-        try:
-            requested_html = request.urlopen(request_info)
-        except HTTPError as e:
-            print(f"Skipping: {e.code}")
+        url = _make_url(current_page, max_price, min_area, days_since_created)
+        soup = _read_html(url)
+        if soup is None:
             continue
 
-        soup = BeautifulSoup(requested_html, features='html.parser')
         _listings_div = soup.find_all('div', {'data-cy': "search.listing"})
         if len(_listings_div) < 2:
             break
         listings_div = _listings_div[1]
         listings_list = listings_div.find_all('li', {"class": "css-p74l73 es62z2j17"})
 
-        for listing_element in tqdm(listings_list):
+        for listing_element in stqdm(listings_list[:max_search], desc='Downloading Listings', leave=True, bar_format=BAR_FORMAT):
             listing_property_dict = {}
             header_basic_info = [
                 unicodedata.normalize("NFKD", e.text) for e in
