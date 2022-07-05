@@ -23,10 +23,10 @@ def get_data(max_search=3, max_price=4000, min_area=40, days_since_created=2, **
 
 def main():
     try:
-        max_price = st.sidebar.slider("Max Price", 0, 1000, 4000, 100)
-        min_area = st.sidebar.slider("Min Area", 0, 100, 40, 1)
+        max_price = st.sidebar.slider("Max Price", 0, 1000, 3700, 100)
+        min_area = st.sidebar.slider("Min Area", 0, 100, 48, 1)
         days_since_created = st.sidebar.slider("Days Since Created", 1, 14, 2, 1)
-        max_search = st.sidebar.slider("Max Listings Search", 1, 1000, 300, 1)
+        max_search = st.sidebar.slider("Max Listings Search", 1, 1000, 250, 1)
         max_distance = st.sidebar.slider("Max Distance", 0.0, 10.0, 4.0, 0.1)
         max_duration = st.sidebar.slider("Max Duration", 0, 30, 10, 1)
         if st.button('Run Scrapper'):
