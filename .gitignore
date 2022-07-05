@@ -3,3 +3,4 @@
 /summary/
 /.ipynb_checkpoints/
 /.idea/
+/.streamlit/secrets.toml

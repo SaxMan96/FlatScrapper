@@ -90,7 +90,7 @@ def _get_price_threshold(x):
     return 2300 - 1.9 * (1 - np.exp(0.095 * x))
 
 
-def post_processing(df=None, save=True):
+def post_processing(df=None, save=True, **kwargs):
     if df is None:
         data_path = sorted(glob.glob("data/raw/*.csv"))[-1]
         logging.info(f"data path: {data_path}")
@@ -121,7 +121,7 @@ def post_processing(df=None, save=True):
 
     df = _drop_fakes(df)
     df = _download_geo_data(df)
-    df = _filter_data(df)
+    df = _filter_data(df, **kwargs)
     df = _order_by_rank(df)
 
     current_time = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
@@ -162,12 +162,12 @@ def _download_geo_data(df):
     return df
 
 
-def _filter_data(df):
+def _filter_data(df, max_distance=4, max_duration=10, min_area=45, max_price=3500):
     return df[
-        (df.distance <= MIN_DISTANCE) &
-        (df.duration < MIN_DURATION) &
-        (df.area >= MIN_AREA) &
-        (df['_price'] <= MAX_PRICE)
+        (df.distance <= max_distance) &
+        (df.duration < max_duration) &
+        (df.area >= min_area) &
+        (df['_price'] <= max_price)
         ]
 
 
